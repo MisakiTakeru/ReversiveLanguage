@@ -41,12 +41,12 @@ data Stmt = If Expr Stmt Stmt Expr
 
 
 type Env = Map.Map String Integer 
-type MapList = [([Char], Integer)]
+--type Variables = [([Char], Integer)]
 
 
-variables = []
+variables = [("x",0)]
 
-env = Map.fromList mapList
+env = Map.fromList variables
 
 
 languageDef = 
@@ -104,46 +104,40 @@ parser :: Parser Stmt
 parser = whiteSpace >> stmtParser
 
 stmtParser :: Parser Stmt
-stmtParser vars = 
-    do  (variables,list) <- (sepBy1 (statement vars) semi)
-        return $ if length list == 1 then (variables,head list) else (variables,Seq list)
+stmtParser = 
+    do  list <- (sepBy1 statement semi)
+        return $ if length list == 1 then head list else Seq list
 
--- Only works with parser because all variables start at 0
-ensureVariableInMapList s vars = do
-    if elem (s,0) mapList
-        then vars
-        else vars ++ [(s, 0)]
         
 
 statement :: Parser Stmt
-statement vars = ifStmt vars
-        <|> printStmt vars
-        <|> addStmt vars
-        <|> subStmt vars
-        <|> printExpr vars
-        <|> repeatStmt vars
+statement = ifStmt 
+        <|> printStmt
+        <|> addStmt
+        <|> subStmt
+        <|> printExpr
+        <|> repeatStmt
 
-ifStmt vars = do  
+ifStmt = do  
         reserved "if";
         expr1 <- expressionParser;
         reserved "then";
-        (vars1,first) <- stmtParser vars;
+        first <- stmtParser;
         reserved "else";
-        (vars2,second) <- stmtParser vars1;
+        second <- stmtParser;
         reserved "fi";
         expr2 <- expressionParser;
-        return (vars2,(If expr1 first second expr2))
+        return (If expr1 first second expr2)
         
-repeatStmt vars = do
+repeatStmt = do
             reserved "repeat";
-            stmt <- stmtParser vars;
+            stmt <- stmtParser;
             reserved "until";
             expr <- expressionParser;
             return (Repeat stmt expr)
                                
-addStmt vars = try ( do
+addStmt = try ( do
              var <- identifier;
-             newvars <- ensureVariableInMapList var vars;
              reservedOp "+=";
              expr <- expressionParser;
              return (AddTo var expr)
@@ -151,7 +145,6 @@ addStmt vars = try ( do
             
 subStmt = try ( do 
              var <- identifier;
-             newvars <- ensureVariableInMapList var vars;
              reservedOp "-=";
              expr <- expressionParser;
              return (SubTo var expr)
