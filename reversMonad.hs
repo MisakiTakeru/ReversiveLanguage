@@ -3,7 +3,7 @@ module Main (main) where
 import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec
-import Control.Monad
+import Control.Monad.State
 import System.IO
 import Text.Parsec.String
 import Control.Applicative((<*))
@@ -12,10 +12,8 @@ import System.Environment(getArgs)
 import qualified Data.Map as Map
 import Control.Monad.IO.Class
 
-data Val = Number Int
-    deriving (Eq, Show, Read)
 
-data Expr = Const Integer | Var String | Binary Operators Expr Expr | Val
+data Expr = Const Integer | Var String | Binary Operators Expr Expr
     deriving (Eq, Show, Read)
 
 
@@ -26,62 +24,30 @@ data Operators =  Add
                 | Mod
                 | Eq
                 | Lt
-                | Or
+--                | Or
     deriving (Eq, Show, Read)
 
 data Stmt = If Expr Stmt Stmt Expr
             | Repeat Stmt Expr 
-            | Stmt Stmt 
+--            | Stmt Stmt 
             | Prints String 
             | Read String
             | Seq [Stmt]
-            | Expr
+--            | Expr
             | AddTo String Expr 
             | SubTo String Expr 
-            | Printse Expr
+--            | Printse Expr
     deriving (Eq, Show, Read)
 
+data Procedure = Procedure String Stmt
+--                 Seq [Procedure]
 
-type Env = Map.Map String Integer 
---type Env = [([Char], Integer)]
-
-
-newtype Evaluate a = Evaluate {runEvaluate :: Env -> Either String (a,Env)}
-
-instance Functor Evaluate where
-    fmap f m = m >>= \a -> return (f a)
+type VEnv = Map.Map String Integer 
+type PEnv = Map.Map String Stmt
+type Env = (VEnv, PEnv, Integer)
 
 
-instance Applicative Evaluate where
-    pure = return
-    (<*>) = ap
-
-instance Monad Evaluate where
-    return a = Evaluate (\env -> return (a,env))
-    m >>= f = Evaluate (\x -> case runEvaluate m x of
-                                Left a -> Left a
-                                Right (a, env') -> runEvaluate (f a) env')
-    fail s = Evaluate (\_ -> Left s)
-
-modifyEnvironment :: String -> Integer -> Evaluate()
-modifyEnvironment name val = Evaluate $ \env -> Right ((), Map.insert name val env)
-
-
-
-getVariable :: String -> Evaluate Integer
-getVariable name = Evaluate $ \env -> case Map.lookup name env of
-    Nothing -> Left ("Variable" ++ name ++ "is not in the environment")
-    Just a -> Right (a, env)
-  
-
-
-variables = [("x",1),("y",0)]
-
-env = Map.fromList variables
-
-occurs var [] = 0
-occurs var ((x,y):xs) = (if var == x then 1 else 0) + occurs var xs
-
+type MyState a = StateT Env IO a
 
 
 languageDef = 
@@ -100,6 +66,7 @@ languageDef =
                                       , "uncall"
                                       , "print"
                                       , "read"
+                                      , "procedure"
                                       ]
              , Token.reservedOpNames = ["+","-","*","/","%","<","=","||","+=","-="]
              }
@@ -128,6 +95,8 @@ operator = [
              ,  Infix  (reservedOp "/"   >> return (Binary Div)) AssocLeft]
              , [Infix  (reservedOp "+"   >> return (Binary Add)) AssocLeft
              ,  Infix  (reservedOp "-"   >> return (Binary Sub)) AssocLeft]
+             , [Infix  (reservedOp "="   >> return (Binary Eq )) AssocLeft
+             ,  Infix  (reservedOp "<"   >> return (Binary Lt )) AssocLeft]
             ] 
 
 
@@ -137,6 +106,14 @@ term =  liftM Const integer
 
 parser :: Parser Stmt
 parser = whiteSpace >> stmtParser
+
+{-
+procedure = do
+            reserved "procedure"
+            name <- identifier
+            stmt <- statement
+            return (Procedure name stmt)
+-}
 
 stmtParser :: Parser Stmt
 stmtParser = 
@@ -150,8 +127,8 @@ statement = ifStmt
         <|> printStmt
         <|> addStmt
         <|> subStmt
-        <|> printExpr
         <|> repeatStmt
+        <|> readStmt
 
 ifStmt = do  
         reserved "if";
@@ -186,7 +163,6 @@ subStmt = try ( do
               )
                    
 
-
 printStmt = try ( do
             reserved "print";
             var <- identifier;
@@ -199,109 +175,148 @@ readStmt = try ( do
             return (Read var)
                 )
 
-printExpr = try ( do
-                reserved "print";
-                expr <- expressionParser;
-                return (Printse expr)
-                )
 
-
-interpret :: Stmt -> Evaluate()
+interpret :: Stmt -> MyState ()
 interpret (If e1 s1 s2 e2) = do
-    expr1 <- evalExpr e1;
-    expr2 <- evalExpr e2;
-    case (expr1 > 0 || expr1 == 0) of
+    (_,_,call) <- get
+    expr <- if call == 1
+        then evalExpr e1;
+        else evalExpr e2;
+    case (expr > 0 || expr == 0) of
         False -> fail "If expression is not allowed to be lower than 0"
-        True -> case expr1 of
+        True -> case expr of
             0 -> interpret s2
             _ -> interpret s1
 
 interpret (AddTo s e) = do
-    var <- getVariable s
-    expr <- evalExpr e
-    modifyEnvironment s (var + expr)
+    (_,_,call) <- get
+    case call of
+        1 -> changeVariable "+" s e
+        0 -> changeVariable "-" s e
+        
 
 
 interpret (SubTo s e) = do
-    var <- getVariable s
-    expr <- evalExpr e
-    modifyEnvironment s (var - expr)
-                                     
+    (_,_,call) <- get
+    case call of
+        1 -> changeVariable "-" s e
+        0 -> changeVariable "+" s e
+
+
+
+
+
 
 interpret (Repeat s e) = do
+    (_,_,call) <- get
     expr <- evalExpr e
-    case (expr > 0) of
-        False -> fail "First expression must be true"
-        True -> recursive s e
+    case call of
+        1 ->  case (expr > 0) of
+                False -> fail "First expression must be true"
+                True -> recursive s e
+        0 -> case (expr > 0) of
+                False -> uncallRecursive s e
+                True -> fail "Uncall expression must be false first"
 
 interpret (Seq(x:xs)) = do 
-    interpret x 
-    interpret (Seq xs)
+    (_,_,call) <- get
+    case call of
+        1 -> do interpret x
+                interpret (Seq xs)
+
+        0 -> do interpret (Seq xs)
+                interpret x
 
 interpret (Seq []) = do return ()
 
-{-
-interpret (Read s) = do
-    var <- unsafePerformIO (readLn :: Evaluate)
-    case getVariable s of
-        Left _ -> modifyEnvironment var
-        Right a -> case a of
-            0 -> modifyEnvironment var
-            _ -> fail "Variable is a non zero value"
 
+interpret (Read s) = do
+    (_,_,call) <- get
+    case call of
+        1 -> reading s
+        0 -> printing s
 
 interpret (Prints s) = do
-    var <- getVariable s
-    putStrLn $ show var
+    (_,_,call) <- get
+    case call of
+        1 -> printing s
+        0 -> reading s
+
+reading :: String -> MyState ()
+reading s = do
+    (vEnv,pEnv,call) <- get
+    x <- lift ( readLn :: IO Integer)
+    case Map.member s vEnv of
+        False -> put $ (Map.insert s x vEnv,pEnv,call)
+        True -> do v <- (gets (\(vEnv,_,_) -> vEnv Map.! s))
+                   case v of
+                    0 -> put $ (Map.insert s x vEnv,pEnv,call)
+                    _ -> fail "existing variable is not 0"
 
 
+printing :: String -> MyState ()
+printing s = do
+    (vEnv,pEnv,call) <- get
+    var <- gets (\(vEnv,_,_) -> vEnv Map.! s)
+    put $ (Map.insert s 0 vEnv,pEnv,call)
+    liftIO $ print var
 
---                    Printse e -> do
---                                      expr1 <- evalExpr e;
---                                      print expr1;
---                                      return expr1;
-                                    
---        Prints s -> do 
---            case lookup s vars of
---                Just x -> print x
 
---                    Read s -> do
---                                      newVars <- if occurs s vars
---                                                    then checkEnvironment s
---                                                    else vars ++ [(s,0)]
+changeVariable op s e = do
+    (vEnv,pEnv,call) <- get
+    expr <- evalExpr e
+    case Map.member s vEnv of
+        True -> do vars <- gets (\(vEnv,_,_) -> vEnv Map.! s)
+                   case op of
+                    "+" -> put $ (Map.insert s (vars + expr) vEnv,pEnv,call)
+                    "-" -> put $ (Map.insert s (vars - expr) vEnv,pEnv,call)
+                    _ -> fail "only possible to add or substract"
 
-                                      
-        Seq (s:ss) -> do
-            sequences (s:ss) vars
-        
+        False -> case op of
+            "+" -> put $ (Map.insert s expr vEnv,pEnv,call)
+            "-" -> put $ (Map.insert s (-expr) vEnv,pEnv,call)
+            _ -> fail "only possible to add or substract"
 
-sequences [] vars = return () 
-sequences (s:ss) vars = do
-    (stmt, newVars) <- interpret s vars 
-    sequences ss newVars
-                                      
--}                                      
 
 recursive s e = do
     interpret s
     expr <- evalExpr e
     if expr == 0
-        then interpret s
+        then return ()
         else recursive s e
 
+uncallRecursive s e = do
+    interpret s
+    expr <- evalExpr e
+    if expr == 0
+        then recursive s e
+        else return ()
 
 evalInteger op x y = do
                     a <- evalExpr x;
-                    b <- evalExpr y
-                    return (a `op` b)
+                    b <- evalExpr y;
+                    return $ (a `op` b)
 
+evalConditionals :: (Integer -> Integer -> Bool) -> Expr -> Expr -> MyState Integer
+evalConditionals op x y = do
+                    a <- evalExpr x;
+                    b <- evalExpr y;
+                    case (a `op` b) of
+                        True -> return 1
+                        False -> return 0
+
+evalExpr :: Expr -> MyState Integer
 evalExpr (Const n)        = return n
-evalExpr (Var v)          = getVariable v
+evalExpr (Var v)          = do s <- gets (\(vEnv,_,_) -> vEnv Map.! v)
+                               return s
 evalExpr (Binary Add x y) = do evalInteger (+) x y
 evalExpr (Binary Sub x y) = do evalInteger (-) x y
 evalExpr (Binary Mul x y) = do evalInteger (*) x y
 evalExpr (Binary Div x y) = do evalInteger (div) x y
 evalExpr (Binary Mod x y) = do evalInteger (mod) x y
+evalExpr (Binary Eq  x y) = do evalConditionals (==) x y
+evalExpr (Binary Lt  x y) = do evalConditionals (<) x y
+
 
 
 runInput :: String -> Stmt
@@ -316,16 +331,19 @@ runInput str =
 
 main :: IO ()
 main = do 
---    args <- getArgs
---    case args of
---        [file] -> do
-            s <- readFile "test.hs"
+    (args: path) <- getArgs
+    x <- case args of
+        "call" -> return 1
+        "uncall" -> return 0 
+        _ -> error "neither call nor uncall was called"
+--    print x
+    case path of
+        [file] -> do
+            s <- readFile file
             case parse parser "" (read s) of
                 Left e -> error $ show e
-                Right s -> case runEvaluate (interpret s) env of
-                    Left e -> error $ show e
-                    Right (s,_) -> return ()
---        _ -> error "path given is not a file"
+                Right s -> runStateT (interpret s) (Map.empty,Map.empty,x) >> return ()
+        _ -> error "path given is not a file"
 
 
 {-
