@@ -2,16 +2,16 @@ module Main (main) where
 
 import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Expr
-import Text.ParserCombinators.Parsec
+--import Text.ParserCombinators.Parsec
 import Control.Monad.State
 import System.IO
 import Text.Parsec.String
 import Control.Applicative((<*))
 import qualified Text.ParserCombinators.Parsec.Token as Token
 import System.Environment(getArgs)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Control.Monad.IO.Class
-
+import Text.Parsec
 
 data Expr = Const Integer | Var String | Binary Operators Expr Expr
     deriving (Eq, Show, Read)
@@ -36,11 +36,13 @@ data Stmt = If Expr Stmt Stmt Expr
 --            | Expr
             | AddTo String Expr 
             | SubTo String Expr 
+            | UnCall String
+            | Call String
 --            | Printse Expr
     deriving (Eq, Show, Read)
 
 data Procedure = Procedure String Stmt
---                 Seq [Procedure]
+--                 | [Procedure]
 
 type VEnv = Map.Map String Integer 
 type PEnv = Map.Map String Stmt
@@ -48,7 +50,7 @@ type Env = (VEnv, PEnv, Integer)
 
 
 type MyState a = StateT Env IO a
-
+type ParserState a = Parsec String PEnv a
 
 languageDef = 
     emptyDef { Token.commentStart   = "/*"
@@ -84,7 +86,7 @@ integer = Token.integer lexer
 semi = Token.semi lexer
 whiteSpace = Token.whiteSpace lexer
 
-expressionParser :: Parser Expr
+expressionParser :: ParserState Expr
 expressionParser = buildExpressionParser operator term
                  <?> "expression"
 
@@ -105,32 +107,41 @@ term =  liftM Const integer
     <|> liftM Var identifier
  
 
-parser :: Parser Stmt
-parser = whiteSpace >> stmtParser
+parser :: ParserState PEnv
+parser = whiteSpace >> procedureParser
 
-{-
+procedureParser :: ParserState PEnv
+procedureParser =
+    do many1 procedure
+       state <- getState
+       return state
+
+procedure :: ParserState ()
 procedure = do
             reserved "procedure"
             name <- identifier
-            stmt <- statement
-            return (Procedure name stmt)
--}
+            stmt <- stmtParser
+            modifyState (Map.insert name stmt)
 
-stmtParser :: Parser Stmt
+
+stmtParser :: ParserState Stmt
 stmtParser = 
-    do  list <- (sepBy1 statement semi)
+    do  list <- (endBy statement semi)
         return $ Seq list
 
         
 
-statement :: Parser Stmt
+statement :: ParserState Stmt
 statement = ifStmt 
         <|> printStmt
         <|> addStmt
         <|> subStmt
         <|> repeatStmt
         <|> readStmt
+        <|> callStmt
+        <|> unCallStmt
 
+ifStmt :: ParserState Stmt
 ifStmt = do  
         reserved "if";
         expr1 <- expressionParser;
@@ -141,21 +152,24 @@ ifStmt = do
         reserved "fi";
         expr2 <- expressionParser;
         return (If expr1 first second expr2)
-        
+
+repeatStmt :: ParserState Stmt
 repeatStmt = do
             reserved "repeat";
             stmt <- stmtParser;
             reserved "until";
             expr <- expressionParser;
             return (Repeat stmt expr)
-                               
+                
+addStmt :: ParserState Stmt
 addStmt = try ( do
              var <- identifier;
              reservedOp "+=";
              expr <- expressionParser;
              return (AddTo var expr)
               )     
-            
+
+subStmt :: ParserState Stmt
 subStmt = try ( do 
              var <- identifier;
              reservedOp "-=";
@@ -164,17 +178,37 @@ subStmt = try ( do
               )
                    
 
+printStmt :: ParserState Stmt
 printStmt = try ( do
             reserved "print";
             var <- identifier;
             return (Prints var)
                 )
 
+readStmt :: ParserState Stmt
 readStmt = try ( do
             reserved "read";
             var <- identifier;
             return (Read var)
                 )
+
+callStmt :: ParserState Stmt
+callStmt = do
+            reserved "call";
+            var <- identifier;
+            return (Call var)
+
+unCallStmt :: ParserState Stmt
+unCallStmt = do
+            reserved "uncall";
+            var <- identifier;
+            return (UnCall var)
+
+findMain :: PEnv -> Stmt
+findMain s = s Map.! "main"   
+
+
+
 
 
 interpret :: Stmt -> MyState ()
@@ -199,7 +233,7 @@ interpret (AddTo s e) = do
     (_,_,call) <- get
     case call of
         1 -> changeVariable "+" s e
-        0 -> changeVariable "-" s e
+        -1 -> changeVariable "-" s e
         
 
 
@@ -207,7 +241,7 @@ interpret (SubTo s e) = do
     (_,_,call) <- get
     case call of
         1 -> changeVariable "-" s e
-        0 -> changeVariable "+" s e
+        -1 -> changeVariable "+" s e
 
 
 
@@ -228,8 +262,8 @@ interpret (Seq(x:xs)) = do
         1 -> do interpret x
                 interpret (Seq xs)
 
-        0 -> do interpret (Seq xs)
-                interpret x
+        -1 -> do interpret (Seq xs)
+                 interpret x
 
 interpret (Seq []) = do return ()
 
@@ -238,13 +272,29 @@ interpret (Read s) = do
     (_,_,call) <- get
     case call of
         1 -> reading s
-        0 -> printing s
+        -1 -> printing s
 
 interpret (Prints s) = do
     (_,_,call) <- get
     case call of
         1 -> printing s
-        0 -> reading s
+        -1 -> reading s
+
+interpret (Call s) = do
+    stmt <- gets (\(_, pEnv,_) -> pEnv Map.! s)
+    interpret stmt
+--    case pEnv Map.! s of
+--        Error e -> fail "procedure does not exist"
+--        statement -> do interpret statement
+                        
+
+interpret (UnCall s) = do
+    modify (\(vEnv,pEnv,call) -> (vEnv,pEnv,(-call))) 
+    stmt <- gets (\(_, pEnv,_) -> pEnv Map.! s)
+    interpret stmt    
+    modify (\(vEnv,pEnv,call) -> (vEnv,pEnv,(-call))) 
+
+
 
 reading :: String -> MyState ()
 reading s = do
@@ -329,12 +379,13 @@ evalExpr (Binary Lt  x y) = do evalConditionals (<) x y
 evalExpr (Binary Or  x y) = do evalBool x y
 
 
+{-
 runInput :: String -> Stmt
 runInput str = 
     case parse parser "" str of
         Left err -> error $ show  err
         Right r -> r
-
+-}
 
 
 main :: IO ()
@@ -342,14 +393,17 @@ main = do
     (args: path) <- getArgs
     x <- case args of
         "call" -> return 1
-        "uncall" -> return 0 
+        "uncall" -> return (-1) 
         _ -> error "neither call nor uncall was called"
     case path of
         [file] -> do
             s <- readFile file
-            case parse parser "" (read s) of
+
+            case runParser parser Map.empty "" (read s) of
                 Left e -> error $ show e
-                Right s -> runStateT (interpret s) (Map.empty,Map.empty,x) >> return ()
+                Right s -> let mainStatement = findMain s                   
+                    in runStateT (interpret mainStatement) (Map.empty, s ,x) >> return ()
+
         _ -> error "path given is not a file"
 
 
