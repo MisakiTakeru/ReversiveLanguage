@@ -24,7 +24,7 @@ data Operators =  Add
                 | Mod
                 | Eq
                 | Lt
---                | Or
+                | Or
     deriving (Eq, Show, Read)
 
 data Stmt = If Expr Stmt Stmt Expr
@@ -97,6 +97,7 @@ operator = [
              ,  Infix  (reservedOp "-"   >> return (Binary Sub)) AssocLeft]
              , [Infix  (reservedOp "="   >> return (Binary Eq )) AssocLeft
              ,  Infix  (reservedOp "<"   >> return (Binary Lt )) AssocLeft]
+             , [Infix  (reservedOp "||"  >> return (Binary Or )) AssocLeft]
             ] 
 
 
@@ -118,7 +119,7 @@ procedure = do
 stmtParser :: Parser Stmt
 stmtParser = 
     do  list <- (sepBy1 statement semi)
-        return $ if length list == 1 then head list else Seq list
+        return $ Seq list
 
         
 
@@ -179,14 +180,20 @@ readStmt = try ( do
 interpret :: Stmt -> MyState ()
 interpret (If e1 s1 s2 e2) = do
     (_,_,call) <- get
-    expr <- if call == 1
+    entryExpr <- if call == 1
         then evalExpr e1;
         else evalExpr e2;
-    case (expr > 0 || expr == 0) of
+    case (entryExpr > 0 || entryExpr == 0) of
         False -> fail "If expression is not allowed to be lower than 0"
-        True -> case expr of
+        True -> case entryExpr of
             0 -> interpret s2
             _ -> interpret s1
+    exitExpr <- if call == 1
+        then evalExpr e2;
+        else evalExpr e1;
+    case (exitExpr > 0 && entryExpr > 0) || (exitExpr == 0 && entryExpr == 0)  of
+        True -> return ()
+        False -> fail "entry and exit expression does not give the same branch"
 
 interpret (AddTo s e) = do
     (_,_,call) <- get
@@ -210,13 +217,10 @@ interpret (SubTo s e) = do
 interpret (Repeat s e) = do
     (_,_,call) <- get
     expr <- evalExpr e
-    case call of
-        1 ->  case (expr > 0) of
-                False -> fail "First expression must be true"
-                True -> recursive s e
-        0 -> case (expr > 0) of
-                False -> uncallRecursive s e
-                True -> fail "Uncall expression must be false first"
+    case (expr > 0) of
+        False -> fail "First expression must be true"
+        True -> recursive s e
+
 
 interpret (Seq(x:xs)) = do 
     (_,_,call) <- get
@@ -281,16 +285,10 @@ changeVariable op s e = do
 recursive s e = do
     interpret s
     expr <- evalExpr e
-    if expr == 0
-        then return ()
-        else recursive s e
-
-uncallRecursive s e = do
-    interpret s
-    expr <- evalExpr e
-    if expr == 0
+    if expr == 0 && expr >= 0
         then recursive s e
         else return ()
+
 
 evalInteger op x y = do
                     a <- evalExpr x;
@@ -305,6 +303,18 @@ evalConditionals op x y = do
                         True -> return 1
                         False -> return 0
 
+
+evalBool :: Expr -> Expr -> MyState Integer
+evalBool x y = do
+            a <- evalExpr x;
+            b <- evalExpr y;
+            case (a, b) of
+                (1,_) -> return 1
+                (_,1) -> return 1
+                _ -> return 0
+                
+
+
 evalExpr :: Expr -> MyState Integer
 evalExpr (Const n)        = return n
 evalExpr (Var v)          = do s <- gets (\(vEnv,_,_) -> vEnv Map.! v)
@@ -316,7 +326,7 @@ evalExpr (Binary Div x y) = do evalInteger (div) x y
 evalExpr (Binary Mod x y) = do evalInteger (mod) x y
 evalExpr (Binary Eq  x y) = do evalConditionals (==) x y
 evalExpr (Binary Lt  x y) = do evalConditionals (<) x y
-
+evalExpr (Binary Or  x y) = do evalBool x y
 
 
 runInput :: String -> Stmt
@@ -326,8 +336,6 @@ runInput str =
         Right r -> r
 
 
---runEval :: Stmt -> Either Error Value
---runEval stmt = case runEvaluate (interpret stmt)
 
 main :: IO ()
 main = do 
@@ -336,7 +344,6 @@ main = do
         "call" -> return 1
         "uncall" -> return 0 
         _ -> error "neither call nor uncall was called"
---    print x
     case path of
         [file] -> do
             s <- readFile file
@@ -346,11 +353,3 @@ main = do
         _ -> error "path given is not a file"
 
 
-{-
-              s <- readFile "test.hs"
-              putStrLn (show s)
-              case parse parser "" (read s) of
-                Left e -> error $ show e
-                Right s -> runEvaluate (interpret s)
-
--}
