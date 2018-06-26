@@ -16,6 +16,7 @@ import Text.Parsec
 data Expr = Const Integer | Var String | Binary Operators Expr Expr
     deriving (Eq, Show, Read)
 
+data Variable = Val Integer | Arr [Integer]
 
 data Operators =  Add
                 | Sub
@@ -38,18 +39,20 @@ data Stmt = If Expr Stmt Stmt Expr
             | SubTo String Expr 
             | UnCall String
             | Call String
+            | Push String Expr
+            | Pop String Expr
 --            | Printse Expr
     deriving (Eq, Show, Read)
 
 data Procedure = Procedure String Stmt
 --                 | [Procedure]
 
-type VEnv = Map.Map String Integer 
+type VEnv = Map.Map String Variable 
 type PEnv = Map.Map String Stmt
 type Env = (VEnv, PEnv, Integer)
 
 
-type MyState a = StateT Env IO a
+type InterpreterState a = StateT Env IO a
 type ParserState a = Parsec String PEnv a
 
 languageDef = 
@@ -69,6 +72,8 @@ languageDef =
                                       , "print"
                                       , "read"
                                       , "procedure"
+                                      , "pop"
+                                      , "push"
                                       ]
              , Token.reservedOpNames = ["+","-","*","/","%","<","=","||","+=","-="]
              }
@@ -140,6 +145,8 @@ statement = ifStmt
         <|> readStmt
         <|> callStmt
         <|> unCallStmt
+        <|> popStmt
+        <|> pushStmt
 
 ifStmt :: ParserState Stmt
 ifStmt = do  
@@ -204,6 +211,21 @@ unCallStmt = do
             var <- identifier;
             return (UnCall var)
 
+popStmt :: ParserState Stmt
+popStmt = do
+            reserved "pop";
+            var <- identifier;
+            expr <- expressionParser;
+            return (Pop var expr)
+
+pushStmt :: ParserState Stmt
+pushStmt = do
+            reserved "push";
+            var <- identifier;
+            expr <- expressionParser;
+            return (Push var expr)
+
+
 findMain :: PEnv -> Stmt
 findMain s = s Map.! "main"   
 
@@ -211,7 +233,7 @@ findMain s = s Map.! "main"
 
 
 
-interpret :: Stmt -> MyState ()
+interpret :: Stmt -> InterpreterState ()
 interpret (If e1 s1 s2 e2) = do
     (_,_,call) <- get
     entryExpr <- if call == 1
@@ -283,9 +305,6 @@ interpret (Prints s) = do
 interpret (Call s) = do
     stmt <- gets (\(_, pEnv,_) -> pEnv Map.! s)
     interpret stmt
---    case pEnv Map.! s of
---        Error e -> fail "procedure does not exist"
---        statement -> do interpret statement
                         
 
 interpret (UnCall s) = do
@@ -295,25 +314,65 @@ interpret (UnCall s) = do
     modify (\(vEnv,pEnv,call) -> (vEnv,pEnv,(-call))) 
 
 
+interpret (Push s e) = do
+    (vEnv,_,call) <- get
+    case call of
+        1 -> pushing s e
+        -1 -> popping s e
 
-reading :: String -> MyState ()
+interpret (Pop s e) = do
+    (vEnv,_,call) <- get
+    case call of
+        1 -> popping s e
+        -1 -> pushing s e
+
+
+pushing :: String -> Expr -> InterpreterState ()
+pushing s e = do
+    (vEnv,pEnv,call) <- get
+    expr <- evalExpr e
+    case Map.member s vEnv of
+        False -> put $ (Map.insert s (Arr ([] ++ [expr])) vEnv,pEnv,call)
+        True -> do v <- (gets (\(vEnv,_,_) -> vEnv Map.! s))
+                   case v of 
+                    Arr stack -> put $ (Map.insert s (Arr (stack ++ [expr])) vEnv,pEnv,call)
+                    Val value -> fail "cannot push to value"
+
+
+popping :: String -> Expr -> InterpreterState ()
+popping s e = do
+    (vEnv,pEnv,call) <- get
+    expr <- evalExpr e
+    case Map.member s vEnv of
+        False -> fail "stack does not exist in environment"
+        True -> do v <- (gets (\(vEnv,_,_) -> vEnv Map.! s))
+                   case v of
+                    Arr stack -> case (expr == (last stack)) of
+                        True -> put $ (Map.insert s (Arr (drop (length stack) stack)) vEnv,pEnv,call)
+                        False -> fail "top of stack must be equal to expression"
+                    Val value -> fail "Cannot pop from value"
+
+
+reading :: String -> InterpreterState ()
 reading s = do
     (vEnv,pEnv,call) <- get
     x <- lift ( readLn :: IO Integer)
     case Map.member s vEnv of
-        False -> put $ (Map.insert s x vEnv,pEnv,call)
+        False -> put $ (Map.insert s (Val x) vEnv,pEnv,call)
         True -> do v <- (gets (\(vEnv,_,_) -> vEnv Map.! s))
                    case v of
-                    0 -> put $ (Map.insert s x vEnv,pEnv,call)
+                    Val 0 -> put $ (Map.insert s (Val x) vEnv,pEnv,call)
                     _ -> fail "existing variable is not 0"
 
 
-printing :: String -> MyState ()
+printing :: String -> InterpreterState ()
 printing s = do
     (vEnv,pEnv,call) <- get
     var <- gets (\(vEnv,_,_) -> vEnv Map.! s)
-    put $ (Map.insert s 0 vEnv,pEnv,call)
-    liftIO $ print var
+    case var of
+        Arr v -> fail "cannot print the stack"
+        Val v -> do put $ (Map.insert s (Val 0) vEnv,pEnv,call)
+                    liftIO $ print v
 
 
 changeVariable op s e = do
@@ -321,16 +380,44 @@ changeVariable op s e = do
     expr <- evalExpr e
     case Map.member s vEnv of
         True -> do vars <- gets (\(vEnv,_,_) -> vEnv Map.! s)
-                   case op of
-                    "+" -> put $ (Map.insert s (vars + expr) vEnv,pEnv,call)
-                    "-" -> put $ (Map.insert s (vars - expr) vEnv,pEnv,call)
-                    _ -> fail "only possible to add or substract"
+                   case vars of
+                    Arr v -> changeStack op v expr s
+                    Val v -> case op of
+                        "+" -> put $ (Map.insert s (Val (v + expr)) vEnv,pEnv,call)
+                        "-" -> put $ (Map.insert s (Val (v - expr)) vEnv,pEnv,call)
+                        _ -> fail "only possible to add or substract"
 
         False -> case op of
-            "+" -> put $ (Map.insert s expr vEnv,pEnv,call)
-            "-" -> put $ (Map.insert s (-expr) vEnv,pEnv,call)
+            "+" -> put $ (Map.insert s (Val expr) vEnv,pEnv,call)
+            "-" -> put $ (Map.insert s (Val (-expr)) vEnv,pEnv,call)
             _ -> fail "only possible to add or substract"
 
+changeStack :: String -> [Integer] -> Integer -> String -> InterpreterState ()
+changeStack op stack expr name = do
+    (vEnv,pEnv,call) <- get
+    len <- getStackLength stack
+    newVal <- getNewStackValue stack expr op
+    newStack <- dropFromStack stack
+    put $ (Map.insert name (Arr (newStack ++ [newVal])) vEnv,pEnv,call)
+
+getStackLength :: [Integer] -> InterpreterState Int
+getStackLength stack = do 
+    return $ (length stack)
+
+dropFromStack :: [Integer] -> InterpreterState [Integer]
+dropFromStack stack = do
+    return $ drop ((length stack) - 1) stack
+
+getNewStackValue :: [Integer] -> Integer -> String -> InterpreterState Integer
+getNewStackValue stack value op = 
+    case length stack of
+        0 -> fail "stack is empty"
+        _ -> case op of
+            "+" -> do return $ (last stack) + value
+            "-" -> do return $ (last stack) - value
+            _ -> fail "only possible to add or substract"
+    
+                            
 
 recursive s e = do
     interpret s
@@ -345,7 +432,7 @@ evalInteger op x y = do
                     b <- evalExpr y;
                     return $ (a `op` b)
 
-evalConditionals :: (Integer -> Integer -> Bool) -> Expr -> Expr -> MyState Integer
+evalConditionals :: (Integer -> Integer -> Bool) -> Expr -> Expr -> InterpreterState Integer
 evalConditionals op x y = do
                     a <- evalExpr x;
                     b <- evalExpr y;
@@ -354,7 +441,7 @@ evalConditionals op x y = do
                         False -> return 0
 
 
-evalBool :: Expr -> Expr -> MyState Integer
+evalBool :: Expr -> Expr -> InterpreterState Integer
 evalBool x y = do
             a <- evalExpr x;
             b <- evalExpr y;
@@ -365,10 +452,14 @@ evalBool x y = do
                 
 
 
-evalExpr :: Expr -> MyState Integer
+evalExpr :: Expr -> InterpreterState Integer
 evalExpr (Const n)        = return n
 evalExpr (Var v)          = do s <- gets (\(vEnv,_,_) -> vEnv Map.! v)
-                               return s
+                               case s of
+                                Arr i -> case (length i) of
+                                        0 -> fail "stack is empty"
+                                        _ -> return $ last i
+                                Val i -> return i
 evalExpr (Binary Add x y) = do evalInteger (+) x y
 evalExpr (Binary Sub x y) = do evalInteger (-) x y
 evalExpr (Binary Mul x y) = do evalInteger (*) x y
