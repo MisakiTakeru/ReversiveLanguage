@@ -348,7 +348,7 @@ popping s e = do
         True -> do v <- (gets (\(vEnv,_,_) -> vEnv Map.! s))
                    case v of
                     Arr stack -> case (expr == (last stack)) of
-                        True -> put $ (Map.insert s (Arr (drop (length stack) stack)) vEnv,pEnv,call)
+                        True -> put $ (Map.insert s (Arr (init stack)) vEnv,pEnv,call)
                         False -> fail "top of stack must be equal to expression"
                     Val value -> fail "Cannot pop from value"
 
@@ -397,16 +397,16 @@ changeStack op stack expr name = do
     (vEnv,pEnv,call) <- get
     len <- getStackLength stack
     newVal <- getNewStackValue stack expr op
-    newStack <- dropFromStack stack
+    newStack <- removeFromStack stack
     put $ (Map.insert name (Arr (newStack ++ [newVal])) vEnv,pEnv,call)
 
 getStackLength :: [Integer] -> InterpreterState Int
 getStackLength stack = do 
     return $ (length stack)
 
-dropFromStack :: [Integer] -> InterpreterState [Integer]
-dropFromStack stack = do
-    return $ drop ((length stack) - 1) stack
+removeFromStack :: [Integer] -> InterpreterState [Integer]
+removeFromStack stack = do
+    return $ init stack
 
 getNewStackValue :: [Integer] -> Integer -> String -> InterpreterState Integer
 getNewStackValue stack value op = 
