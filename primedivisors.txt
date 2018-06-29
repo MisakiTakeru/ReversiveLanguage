@@ -1,19 +1,31 @@
 procedure main
 read x;
-z += x;
-p += 1;
+p += 2;
 m += 0;
+z += 0;
+
 repeat
+	
+	
+	if x % p = 0
+	then 
+		m += p - 1;
+		y += x/p*m;
+		x -= y;
+		y -= x*m;
+		m -= p - 1;
+		z -= p - 3;
+		print p;
+		p +=2;
+	else 
+		p += 1;
+		z += 1;
+	fi p = 2;
+	
+	 
+until z = 0 || x < p;
 
-p += 1;
-m += 1;
-if x % p = 0
-then y += x/p*m; x -= y; y -= x*m; m -= p - 2; print p; p +=1;
-else p += 0;
-fi p < 2 || p = 2; 
 
-until x = 1 || p = 1;
-print z;
-m -= p - 1;
 p -= 2;
 print x;
+print z;
