@@ -1,0 +1,246 @@
+\documentclass[10pt,a4paper]{article}      % Book.cls is also usable
+\usepackage[utf8]{inputenc}              % ISO Latin-1 encoding (Western Europe)
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}                 % Danish hyphenation pattern
+\usepackage[english]{varioref} %better references
+\usepackage{charter}                       % Font type - Can be removed.
+\usepackage{graphicx}                      % For graphics
+\usepackage{a4wide}                        % Gives us a bit extra spaces in the margins - Can be removed.
+\usepackage{color, colortbl}               % Use to define colors and give tables a colored background
+\usepackage{fancyhdr}                      % Fancy headers? Yes please.
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{pdfpages}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage[outdir=./pictures/]{epstopdf}
+\usepackage{mathrsfs}
+
+
+\addtolength{\columnsep}{1cm}
+%\def\thesectiondis{\arabic{section}.}
+%\def\thesubsectiondis{\arabic{subsection}.}
+%\def\thesubsection{\thesection.\arabic{subsection}}
+
+
+\lstset{
+  language=Python
+}
+
+\lstset{ %
+language=Python,                % the language of the code
+boxpos=t,
+basicstyle=\footnotesize,       % the size of the fonts that are used for the code
+commentstyle=\color{blue},
+numbers=left,                   % where to put the line-numbers
+numberstyle=\footnotesize,      % the size of the fonts that are used for the line-numbers
+numbersep=5pt,                  % how far the line-numbers are from the code
+showspaces=false,               % show spaces adding particular underscores
+showtabs=false,                 % show tabs within strings adding particular underscores
+frame=single,                   % adds a frame around the code
+captionpos=b,                   % sets the caption-position to bottom
+breaklines=true,                % sets automatic line breaking
+breakatwhitespace=false,        % sets if automatic breaks should only happen at whitespace
+morekeywords={*,...,mod,For,Foreach,ceiling,exp,In,sum,abs,product,End,map,flip,vector,matrix}            % if you want to add more keywords to the set
+}
+
+
+\usepackage{xspace}
+
+
+\newcommand{\df}[1]{\frac{d}{d#1}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\ip}[1]{\left\langle#1\right\rangle}
+\newcommand{\X}{\bar{X}_c}
+\newcommand{\xc}{\overset{c}{x}}
+
+\newcommand{\inT}{z}
+\newcommand{\outT}{o}
+\newcommand{\h}[1]{h^{\textbf{\tiny#1}}}
+\newcommand{\w}[1]{W^{\textbf{\tiny#1}}}
+\newcommand{\p}[1]{\left(#1\right)}
+
+\usepackage{ragged2e}
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+
+
+
+%\bibliographystyle{abstract} %if you're using BibTeX, you set the bibliographystyle here
+\usepackage{tabularx} %bette tabular
+\usepackage{geometry}
+\title{PLD Assignment 2}
+\author{Joachim Normann Larsen (psf664)}
+
+
+\begin{document}
+\hbadness=10000
+\hfuzz=50pt
+\maketitle
+%\thispagestyle{empty}
+%\clearpage
+
+
+\clearpage
+
+\section*{A2.1}
+\subsection*{a}
+The types of True, False and If are conditionals.
+
+\subsection*{b}
+To create the Not function type it must change the chosen value for True, and False, and therefore we create it as:
+\begin{align*}
+let \ Not \ = \ fun \ c \ t \ e \ \rightarrow \ c \ e \ t
+\end{align*}
+Our Not function is almost identical to the If function except it switches the output values of e and t, meaning True will return y instead of x, and False will return x instead of y.
+
+\subsection*{c}
+\begin{align*}
+If \ (Not \ True) \ 3 \ 4 \\
+(fun \ c \ t \ e \ \rightarrow \ c \ t \ e)((fun \ c \ t \ e \ \rightarrow \ c \ e \ t)(fun \ x \ y \ \rightarrow \ x)) \ 3 \ 4 \\
+(fun \ c \ t \ e \ \rightarrow \ c \ e \ t)(fun \ x \ y \ \rightarrow \ x) \ 3 \ 4 \\
+(fun \ x \ y \ \rightarrow \ x) \ 4 \ 3 \\
+4
+\end{align*}
+
+\subsection*{d}
+For the Fst, and Snd we have chosen to define them in the same way as the True and False definitions. As such we define the three functions as:
+
+\begin{align*}
+Let \ Pair \ = \ fun \ x \ y \ \rightarrow \ x \ y \\
+Let \ Fst \ = \ fun \ c \ x \ y \ \rightarrow \ x \\
+Let \ Snd \ = \ fun \ c \ x \ y \ \rightarrow \ y
+\end{align*}
+
+\subsection*{e}
+\begin{align*}
+Snd \ (Pair \ 3 \ 4) \\
+(fun \ c \ x \ y \ \rightarrow \ y)((fun \ x \ y \ \rightarrow \ x \ y) \ 3 \ 4) \\
+(fun \ c \ x \ y \ \rightarrow \ y)( \ 3 \ 4) \\
+4
+\end{align*}
+
+\subsection*{f}
+The reason why it might evaluate both is because it ends up with two functions, itself, and it's condition, which itself evaluates. Another reason why it might is because if outputs both of the branches because it gives c t e. 
+
+\section*{A2.2}
+\subsection*{if (c) $s_1$ else $s_2$}
+For this we wish to ensure a restriction such that $s_1$ and $s_2$ always have the same type, so the expression would only be able to return one specified type.
+\begin{align*}
+if \ (c) \ s_1 \ else \ s_2 \ \rightarrow \ c \ s_1 \ s_2
+\end{align*}
+\subsection*{if (c) s}
+For this case we wish to extend it the expression by the default value of the same type as s, in the case of the condition giving false, which is to show that the condition gave false. By using the default values of types we can more easily extend the code, and by using the default values it is possible to use several different types while using the expression. Below can be seen our changed expression.
+\begin{align*}
+if \ (c) \ s \ \rightarrow \ c \ s \ d
+\end{align*}
+where d is the default value of the same type as s.
+
+\subsection*{do s while (c)}
+For this case we need to extend it by returning the default value of the same type as s, when the while loop ends. By using the default value of type s we allow the usage of s with several different types 
+
+
+
+
+
+\subsection*{while (c) s}
+For this case we need to extend it by returning the default value of the same type as s, when the while loop ends. By using the default value of type s we allow the usage of s with several different types 
+
+
+
+\subsection*{switch (c) {case statements}}
+For the switch case we need to restrict the type of the statements to all be the same type. This is needed such that the return type will always be of the same type.
+
+\section*{A2.3}
+\subsection*{a}
+A function is homomorphic if there exists an i, which is the result of the empty empty list, and an operation $\odot$ on the function. A linear function operates on all elements individually, and keeps the structure, where they use $\oplus$, where in cases of lists $\oplus$ is append. \\
+With a homomorphic function we can also create this exact scenario by defining i as the empty list, and $\odot$ is defined as append. As such we can create a homomorphic function, which acts as a linear function, which means that linear functions are also homomorphic.
+
+\subsection*{b}
+\begin{itemize}
+\item 1. Is homomorphic, where i = 0, and $\odot$ = if nextVal exists then +1
+\item 2. Since it protects the structure and it only needs to check if the number in the element is a prime, it can be checked individually. As such it must mean it is a linear function.
+\item 3. Is homomorphic, where i = [], and $\odot$ = if [] then append else if i[0] < nextVal then drop; append nextVal; else if i[0] == nextVal then append nextVal.
+\item 4. It is homomorphic, where i = [], and $\odot$ = if inputList.occur nextVal = 1 then append else next, where occur outputs the number of times a value occurs in a list.
+\item 5. It is homomorphic, where i = [], and $\odot$ = if list.exist nextVal then next else append nextVal
+\item 6. It is homomorphic, where i = [], and $\odot$ = [nextVal] ++ list.
+
+\end{itemize}
+
+\section*{A2.4}
+\subsection*{a}
+To ensure that m.n $\preceq$ p.q is that $m \leq p$ and $n \leq q$.
+
+\subsection*{b}
+There does exist a type a.b such that a.b $\preceq$ p.q for any p.q, and that is 0.0.
+
+\subsection*{c}
+There does not exist a type a.b such that m.n $\preceq$ a.b for any m and n.
+
+\subsection*{d}
+For this we must test that the amount of digits above the comma of x is not higher than the type of p, or else we can end up in loss of precision, the same goes for the digits after comma of x compared to q.
+
+\subsection*{e}
+For $x+y$ the most precise type would be max(m,p)+1.max(n.q). the reason is that when adding two numbers together we might end up getting an ekstra digit, on the left side of the comma, but on the right side it cannot increase in the amount of digits.
+
+\subsection*{f}
+The most precise type for $x*y$ would be m+p.n+q, as in this case we can get with example of a 2.2 * 2.2, where the values are 15.15*15.15, which would give us 229.5225 have an increase of digits on the left side with 1 in this case, but the right side would have an increase of digits by 2, but with higher numbers of type 2 for the left side such as 99 * 99, we would get 9801 which is also an increase of digits by 2 for the left side, which means that at most we can get the new type as m+p.n+q.
+
+\subsection*{g}
+For $x:= x+y$ to be safe we must have that p.q $\preceq$ m.n, and that another digit is not added to m through x+y or else it would result in overflow. To ensure that it is always safe we need to downcast the sum of the equation such that x can always hold the result.
+
+\section*{A2.5}
+\subsection*{a}
+The variables m1, and m2 are absolute measures, as it is their known weight, and r is relative measure as it is the distance between the two masses.
+
+\subsection*{b}
+\subsubsection*{Adding relative and absolute measures}
+Adding a relative measure and a absolute measure is not legal since adding something to an absolute measure it would first and foremost no longer be absolute, but relative, but will not make sense. In one case should it actually be legal, and that is when finding the absolute measure of another value, where the first units absolute value is known, and the difference between them. This will result in a absolute measure.
+
+\subsubsection*{Adding relative to relative}
+Adding two relative measures of the same unit is legal since it is relative, and do not change any absolute values, and will result in a relative measure.
+
+\subsubsection*{Adding absolute to absolute}
+For adding two absolute values, such as two masses I guess that it should be possible, which in turn gives a absolute value of the two masses. Though in other cases this should not be legal.
+
+\subsection*{c}
+\subsubsection*{Substracting absolute and relative}
+There is no reason to substract a relative measure with an absolute measure.
+
+\subsubsection*{Substracting absolute and absolute}
+When substracting an absolute measure with another absolute measure we will get the difference between the absolute measures, which results in a relative measure.
+
+\subsubsection*{Substracting relative and absolute}
+Substracting between relative and absolute measures will result in an absolute value. This is because we will get absolute - relative, and a relative value in case of same values will be a difference, which will result in the absolute value of another thing, this will only happen if the absolute measure is bigger than the difference of the two measures.
+
+\subsubsection*{Substracting relative and relative}
+When substracting two relative measures it will be a substraction of two differences, which will give a new difference, which results in a new relative measure.
+
+\subsection*{d}
+\subsubsection*{Multiplying absolute and relative}
+Multiplying a absolute, and a relative measure will result in $<type>*<|type|>$.
+
+\subsubsection*{Multiplying absolute and absolute}
+Multiplying two absolute measures will result in $<|type|>^2$
+
+\subsubsection*{Multiplying relative and relative}
+Multiplying two relative measures will result in $<type>^2$
+
+\subsection*{e}
+
+\begin{lstlisting}
+Type = heat | length
+heat = F | K | C
+length = feet | meter
+F = 9/5*val+32 | val*9/5 - 459,7
+K = (val-32)*5/9+273,15 | val + 273,15
+C = val - 273,15 | 5/9*val - 32
+meter = val * 0,3048
+feet = val * 3.28084
+val = [+-]?[0-9]+
+\end{lstlisting}
+
+My rule to determine which unit it would result in would be the leftmost unit in the equation. Such that $F - K$ would result the unit to be in F. In equations where we have something like $F - K * (C / F)$ we would get the units $C/F \ = \ C$, $K * C \ = \ K$ and $F - K \ = \ F$, which would make a full circle of conversions, but with proper syntax all values should be properly converted, and as such should succeed in computing.
+\end{document}

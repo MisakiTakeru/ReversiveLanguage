@@ -1,0 +1,205 @@
+\documentclass[10pt,a4paper]{article}      % Book.cls is also usable
+\usepackage[utf8]{inputenc}              % ISO Latin-1 encoding (Western Europe)
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}                 % Danish hyphenation pattern
+\usepackage[english]{varioref} %better references
+\usepackage{charter}                       % Font type - Can be removed.
+\usepackage{graphicx}                      % For graphics
+\usepackage{a4wide}                        % Gives us a bit extra spaces in the margins - Can be removed.
+\usepackage{color, colortbl}               % Use to define colors and give tables a colored background
+\usepackage{fancyhdr}                      % Fancy headers? Yes please.
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{pdfpages}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage[outdir=./pictures/]{epstopdf}
+\usepackage{mathrsfs}
+
+
+\addtolength{\columnsep}{1cm}
+%\def\thesectiondis{\arabic{section}.}
+%\def\thesubsectiondis{\arabic{subsection}.}
+%\def\thesubsection{\thesection.\arabic{subsection}}
+
+
+\lstset{
+  language=Python
+}
+
+\lstset{ %
+language=Python,                % the language of the code
+boxpos=t,
+basicstyle=\footnotesize,       % the size of the fonts that are used for the code
+commentstyle=\color{blue},
+numbers=left,                   % where to put the line-numbers
+numberstyle=\footnotesize,      % the size of the fonts that are used for the line-numbers
+numbersep=5pt,                  % how far the line-numbers are from the code
+showspaces=false,               % show spaces adding particular underscores
+showtabs=false,                 % show tabs within strings adding particular underscores
+frame=single,                   % adds a frame around the code
+captionpos=b,                   % sets the caption-position to bottom
+breaklines=true,                % sets automatic line breaking
+breakatwhitespace=false,        % sets if automatic breaks should only happen at whitespace
+morekeywords={*,...,mod,For,Foreach,ceiling,exp,In,sum,abs,product,End,map,flip,vector,matrix}            % if you want to add more keywords to the set
+}
+
+
+\usepackage{xspace}
+
+
+\newcommand{\df}[1]{\frac{d}{d#1}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\ip}[1]{\left\langle#1\right\rangle}
+\newcommand{\X}{\bar{X}_c}
+\newcommand{\xc}{\overset{c}{x}}
+
+\newcommand{\inT}{z}
+\newcommand{\outT}{o}
+\newcommand{\h}[1]{h^{\textbf{\tiny#1}}}
+\newcommand{\w}[1]{W^{\textbf{\tiny#1}}}
+\newcommand{\p}[1]{\left(#1\right)}
+
+\usepackage{ragged2e}
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+
+
+
+%\bibliographystyle{abstract} %if you're using BibTeX, you set the bibliographystyle here
+\usepackage{tabularx} %bette tabular
+\usepackage{geometry}
+\title{PLD Assignment 3}
+\author{Joachim Normann Larsen (psf664)}
+
+
+\begin{document}
+\hbadness=10000
+\hfuzz=50pt
+\maketitle
+%\thispagestyle{empty}
+%\clearpage
+
+
+\clearpage
+\section*{3.1}
+\subsection*{a}
+To solve the euler 205 problem in Troll you can write the code
+\begin{lstlisting}
+count (sum 9d4) > (sum 6d6)
+\end{lstlisting}
+and then you calculate probabilities. The output we got from this is 57.314 percent.
+
+\subsection*{b}
+
+\section*{3.2}
+\section*{3.3}
+\section*{3.4}
+\subsection*{b}
+If you create and run the predicate:
+
+\begin{lstlisting}
+elementOf(X,Ys) :- append (_,[X|_],Ys).
+\end{lstlisting}
+
+with the query:
+
+\begin{lstlisting}
+elementOf(2,[1,2,3,4,3,2,1]).
+\end{lstlisting}
+
+we will get the true twice. This happens because the predicate append will give true if the current Ys element is the same as X, and if not, it will call itself with the rest of the Ys. In this case the list exist of two 2's which will result in the predicate returning true twice.
+
+
+\subsection*{c}
+
+Our subset predicate can be found in the earpro.pl file.
+
+\subsection*{d}
+
+We haven't managed to make it succeed, but what we thought as a possible solution is to create a helper function that runs the subset predicate with first input being the list [1,2,3,4], and the second input is the current list in a list of lists, which is a list of all of the 10 different needed checks. Since in cases where the matrix has [1,2,4,2] this will result in a false, but having the input as subset([1,2,4,2],[1,2,3,4]). will result in true.
+
+
+\section*{3.5: Reversible Language}
+
+In this section we will describe the syntax changes we chose, design choices of our language, how we ensure that our language is reversible, and some program examples of the reversible language.
+
+\subsection*{Modifications to the syntax}
+
+Our reversible language are not using the exact same syntax as the specified syntax. The specific change is the usage of Stat; Stat, where in our syntax it is written as Seq [Stat].
+
+\subsection*{Design choices}
+
+\subsubsection*{Variable creation}
+
+In our language we create new variables, when they are called for the first time in a statement. We have chosen to do this at evaluation instead during the parsing to ensure that expressions will not be able to call variables before they are used once in an actual statement.
+
+\subsubsection*{Procedures}
+
+For our procedures we are creating them while parsing. We are doing this to ensure that the statements in a procedure exist in our environment, before they are evaluated, to ensure that it will be possible to call or uncall a procedures statements during the evaluation.
+
+\subsubsection*{Call and Uncall}
+
+To create the call and uncall statements we have inserted a integer in our state, which is $+1$ if currently call, and $-1$ if currently uncall. By doing this we set our call function to evaluate the procedure. While our uncall function changes the integer with $-1$ since $--1$ gives $+1$, and $-+1$ gives $-1$. As such our uncall statement inverts the current integer, and when it is finished uncalling the procedure it reverts the integer back to original.
+
+\subsubsection*{Push and Pop}
+
+In our reversive language we have created an extra language feature which is stacks. We have implemented this by creating two new statements, which are called push and pop.
+\\
+Push will check if the variable given exists, and if it does not will create a new array, and input the given expression into the variable. If the variable does exist it checks whether the variable is an array or an value. In case of an array it will add the expression given as argument into the variable, if it is an value it will return an error.
+\\
+Pop needs to be given a variable name, and a expression. Pop will also check if the variable given exists, and if it does not it will return an error. If it does exist it finds the variable, and in case of being a value it returns an error. In case of an array it checks whether the newest value in the array is the same as the expression. If it is it will pop the value, and if not it will return an error.
+
+\subsubsection*{Read and Print}
+
+The way we have created our read function is that when called it will wait for a user to input an integer. What this means is that it is not possible to call a function with our language with extra arguments, but only when a read is called.
+\\
+Our print function prints out a variable, and sets the variable in the environment to 0.
+
+\subsection*{Ensuring reversibility}
+
+To ensure reversibility we have to first and foremost ensure that the language can evaluate statements from first to last, and from last to first. To do this we took our sequence of statements, and created a recursive function, which during call evaluates the first member, and then calls itself with the rest of the list until it is empty. During a uncall it will first call itself with the rest of the list, and lastly evaluate the current element in the list. This results in the first element of the list being the last evaluated, and the last element being the first evaluated lement.
+
+\subsubsection*{If expr1 Then stmt1 Else stmt2 Fi expr2}
+
+For the if then else fi statements we check during a call expr1, and uncall expr2, to judge which of the two statements it needs to enter, where if the expression gives a negative value it returns an error.
+\\
+after running one of the two statements our language then checks whether the result of the unused expression now would result in the same statement. If this is true then it finishes, and if it is False it returns an error. This ensures that the if then else fi statement must be reversible to run it.
+
+\subsubsection*{var $+=$ and $-=$ expr}
+
+both $+=$ and $-=$ calls the same function with the arguments operator, variable name, and expression. During a call they will call it with their original operator such that $+=$ calls it with $+$, and during uncall it will be called with their inverse operator. This ensures that the functions are reversive. If the variable used is also used in the expression it will return an error. If the variable is a stack, it will update the newest entry in the stack.
+
+\subsubsection*{Repeat}
+
+Since the way I described the syntax Seq [Stmt] together with the way I ensure reversibility in a sequence of statements, there is only one needed implementation of the repeat function.
+
+
+\subsubsection*{Push and Pop}
+
+To make push and pop reversible we have implemented the extra expression in pop such that when uncalled pop will become push, and a uncalled push will become a pop. By having an extra variable (which technically could be ignored in the pop) we can create a guard expression similar to the if then else fi statement. This way we ensure that the use of pop and push are reversible.
+
+\subsection*{Programs}
+
+To compile our language you have to have stack installed, and then use the command stack ghc -- -W reversMonad.hs. After this you can run a program by saying ./reversMonad call/uncall programfile.
+
+\subsubsection*{Faculty}
+
+Our faculty function is using a big amount of iterations, since we are adding. For example with x equals 5, we are first adding 5 once. Then we are adding 4 five times to a nullified variable, which then we are adding $5-2$ $5 * 4$ times to the again nullified variable until x equals 0. Just for five this gives us the amount of iterations as 1 * 5 * 20 * 60 * 120. meaning we have a x! * x-1! ... * 1!
+\\
+Our Faculty function file is called faculty.txt
+
+\subsubsection*{Prime Divisors}
+
+Through several different trials and errors we have come to the conclusion that only printing the prime divisors of a number is an irreversible process. 
+\\
+The reason for this is that a repeat function needs two variables, which goes towards two known numbers, where a known number is if we know what the variable will be at compile time, or a number we can have in a variable which can be printed. However in our case we only have one, and that is that x goes towards 0. Since we constantly revert y back we cannot use y as either a entry or exit condition, which gives us only one repeat condition.
+\\
+For example the case 84, which will give 2 2 3 7 1. If we want to do a uncall of it, the program will be given as input 1 7 3 2 2, but for this we have no possible condition to which the program actually knows to exit when the last input value is given, unless we have a second variable which we can print, such as the amount of exprected numbers outputted. As such creating a reversible program which takes in a input and outputs its prime divisors alone is not possible, but having an extra output such as a counter of the amount of outputted prime numbers makes it possible.
+\\
+Another solution to make it reversible is by making it print the 1 first such that we can set the entry condition for call prime number is 1, which will also give an exit condition for the uncall such that when the input given is 1 the program needs to exit.
+\\
+The differences between these two is minimal, and as such we have chosen to submit both versions. The first solution is called primedivisorsextravariable.txt, and the second solution is called primedivisors.txt.
+\end{document}

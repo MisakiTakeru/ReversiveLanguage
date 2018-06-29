@@ -1,0 +1,202 @@
+\documentclass[10pt,a4paper]{article}      % Book.cls is also usable
+\usepackage[utf8]{inputenc}              % ISO Latin-1 encoding (Western Europe)
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}                 % Danish hyphenation pattern
+\usepackage[english]{varioref} %better references
+\usepackage{charter}                       % Font type - Can be removed.
+\usepackage{graphicx}                      % For graphics
+\usepackage{a4wide}                        % Gives us a bit extra spaces in the margins - Can be removed.
+\usepackage{color, colortbl}               % Use to define colors and give tables a colored background
+\usepackage{fancyhdr}                      % Fancy headers? Yes please.
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{pdfpages}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage[outdir=./pictures/]{epstopdf}
+\usepackage{mathrsfs}
+\usepackage{semantic}
+
+\addtolength{\columnsep}{1cm}
+%\def\thesectiondis{\arabic{section}.}
+%\def\thesubsectiondis{\arabic{subsection}.}
+%\def\thesubsection{\thesection.\arabic{subsection}}
+
+
+\lstset{
+  language=Python
+}
+
+\lstset{ %
+language=Python,                % the language of the code
+boxpos=t,
+basicstyle=\footnotesize,       % the size of the fonts that are used for the code
+commentstyle=\color{blue},
+numbers=left,                   % where to put the line-numbers
+numberstyle=\footnotesize,      % the size of the fonts that are used for the line-numbers
+numbersep=5pt,                  % how far the line-numbers are from the code
+showspaces=false,               % show spaces adding particular underscores
+showtabs=false,                 % show tabs within strings adding particular underscores
+frame=single,                   % adds a frame around the code
+captionpos=b,                   % sets the caption-position to bottom
+breaklines=true,                % sets automatic line breaking
+breakatwhitespace=false,        % sets if automatic breaks should only happen at whitespace
+morekeywords={*,...,mod,For,Foreach,ceiling,exp,In,sum,abs,product,End,map,flip,vector,matrix}            % if you want to add more keywords to the set
+}
+
+
+\usepackage{xspace}
+
+
+\newcommand{\df}[1]{\frac{d}{d#1}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\ip}[1]{\left\langle#1\right\rangle}
+\newcommand{\X}{\bar{X}_c}
+\newcommand{\xc}{\overset{c}{x}}
+
+\newcommand{\inT}{z}
+\newcommand{\outT}{o}
+\newcommand{\h}[1]{h^{\textbf{\tiny#1}}}
+\newcommand{\w}[1]{W^{\textbf{\tiny#1}}}
+\newcommand{\p}[1]{\left(#1\right)}
+
+\usepackage{ragged2e}
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+
+
+
+%\bibliographystyle{abstract} %if you're using BibTeX, you set the bibliographystyle here
+\usepackage{tabularx} %bette tabular
+\usepackage{geometry}
+\title{PLD Assignment 1}
+\author{Joachim Normann Larsen (psf664)}
+
+
+\begin{document}
+\hbadness=10000
+\hfuzz=50pt
+\maketitle
+%\thispagestyle{empty}
+%\clearpage
+
+
+\clearpage
+
+\section*{A1.1}
+BCPL (Basic Cambridge Programming Language) was made by Martin Richard in 1966. As noted in "The BCPL Cintsys and Cintpos User Guide" by Martin Richard, BCPL drew much inspiration from the programming language CPL (The C in CPL have changed multiple times). \\
+It was made to be a simplified version of CPL, and the goal of BCPL was to have a more practical, efficient and compact tool for compiler writing and system programming.
+BCPL is created to be typeless. This means there is no need to say if a value or something else is an integer, a boolean, a pointer or something else. Text data can be specified as string constants, which is a pointer to a static buffer. \\
+It is possible to do interprocedural jumps through calls on library functions. This is also available in the programming language C. BCPL have a global vector, which can be accessed by any part of the program. The size of the global vector has been set to a unknown large size, so that there can be placed a lot of global vectors, and in order to access the global vectors the user need to know where it is stored.
+Besides that BCPL had a intermediate language names OCODE, which could compile to a specific machine language or interpreted. \\
+The programming language B was heavily influenced by BCPL as it was created to be BCPL, but with a new syntax, and later it would be further developed into C.
+\\
+The sources used for this is the first version of BCPL named Project Mac by Martin Richards, his latest version: The BCPL Cintsys and Cintpos User Guide by Martin Richards, The Development of the C Language* by Dennis M. Ritchie, and a small look at BCPL where I cannot find the author, but has credible references (url is http://www.math.bas.bg/bantchev/place/bcpl.html).
+
+\section*{A1.2}
+\subsection*{a}
+We wish to describe the following components through the use of Bratman diagrams, which are:
+
+\begin{itemize}
+\item A compiler, written in x86 code, from C to x86 code
+\item A machine that can execute x86 code
+\item Some unspecified program P written in C
+\end{itemize}
+
+These can be drawn as:
+
+\begin{center}
+    \begin{picture}(230,100)(-90,-20)
+        \put (0,0){\program {P, C}}
+        \put (80,0){\compiler {C,X86,X86}}
+        \put (170,0){\machine{{\tiny x86}}}
+    \end{picture}
+\end{center}
+From left to right the first figure is the program written in C the second is the compiler written in x86 and translates from C to x86, and the last one is the executor of x86 code.
+
+\subsection*{b}
+First we wish to create a source-code optimizer from C to C using x86.
+
+
+\begin{center}
+    \begin{picture}(230,100)(-90,-40)
+    \put(0,0){\compiler{C,C,C}}
+    \put(50,-20){\compiler{C,x86,x86}}
+    \put(50,-40){\machine{{\tiny x86}}}
+    \put(100,0){\compiler{C,x86,C}}
+    \end{picture}
+\end{center}
+
+Now we can create our optimized code and execute it:
+
+\begin{center}
+    \begin{picture}(250,100)(-100,-40)
+        \put(0,0){\program{P,C}}
+        \put(50,-20){\compiler{C,x86,C}}
+        \put(50,-40){\machine{{\tiny x86}}}
+        \put(100,0){\program{P',C}}
+        \put(150,-20){\compiler{C,x86,x86}}
+        \put(150,-40){\machine{{\tiny x86}}}
+        \put(200,0){\program{P',x86}}
+        \put(200,-20){\machine{{\tiny x86}}}
+    \end{picture}
+\end{center}
+
+\section*{A1.3}
+\subsection*{a}
+We wish to convert the infix equation:
+\begin{align*}
+(2+2*(4-5))*6/7
+\end{align*}
+to prefix and postfix notation. \\
+To convert to prefix all operators must come before the operands they affect giving us:
+\begin{align*}
+*+2*3-45/67
+\end{align*}
+For postfix all operators must come after the operands they affect which gives us:
+\begin{align*}
+23+45-*67/*
+\end{align*}
+\subsection*{b}
+Our code can be seen in the included zip files. We have chosen to use python, and have structured it as an lexer, parser, and interpreter, and then our polishize function where our chosen datastructure is a tree. To use our program you have to call python exec.py "insert statement here".
+\\
+Below can be seen a table of our tests.
+
+\begin{table}[]
+\centering
+\caption{The tests used and the results it gave.}
+\label{my-label}
+\begin{tabular}{|l|l|l|}
+\hline
+Infix           & Prefix      & Postfix     \\ \hline
+2+3*4           & +2*34       & 234*+       \\ \hline
+1/2/5           & //125       & 125//       \\ \hline
+1/2/5+2*(2-1)   & +//125*2-21 & 125//2+21-* \\ \hline
+2*(3+4)*(5/6)   & **2+34/56   & 234+*56/*   \\ \hline
+(2+3*(4-5))*6/7 & *+2*3-45/67 & 23+45-*67/* \\ \hline
+\end{tabular}
+\end{table}
+
+\section*{A1.4}
+\subsection*{Benefits}
+Since there will only be occurrences of either $+$ or $*$ as the operator there will be no problems to run any of such expressions. Even if we say it randomly chooses whether the operator is left associative or right associative will give a weird, but solvable tree.
+
+\subsection*{Hazards}
+Since this is the case only when there are either only $+$ or $*$ means that there are no hazards from doing this.
+
+
+\section*{A1.5}
+\subsection*{Advantages}
+Advantages of bitmapping is that the time to find heap pointers will be faster.
+\subsection*{Disadvantages}
+Disadvantages of using the bitmap is the required extra memory allocation usage
+
+\section*{A1.6}
+Since allocation procedure works in blocks means that if the objects are not of the same size, it might try to access different blocks. To fix this problem I would sweep all of the unused objects in the allocated block immediately after allocation.
+
+\section*{A1.7}
+A programming feature which queue can naturally lend itself to in memory management could be the building of expressions. When saving a prefix expression such as + 1 2 it would save it as [+,1,2] and free it again as + 1 2.
+
+\end{document}
